@@ -3,76 +3,136 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<meta name="theme-color" content="#2b2620">
+<meta name="theme-color" content="#0a0610">
 <title>Baduk Blitz</title>
 <style>
-  :root{ --ink:#2b2620; --paper:#efe7d6; --line:#5b4626; }
+  :root{
+    --bg:#0a0610; --bg2:#1a0a18; --felt:#3a0a14;
+    --gold:#ffcc33; --gold2:#ffe88a; --hot:#ff2a5c; --neon:#39ff9e;
+    --cream:#f5ecd6; --mute:#7a6a5a;
+  }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   html,body{margin:0; height:100%;}
   body{
-    background:var(--ink); color:var(--paper);
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,serif;
+    background:
+      radial-gradient(ellipse at 50% -10%, #4a0a24 0%, transparent 55%),
+      radial-gradient(ellipse at 50% 110%, #2a0628 0%, transparent 60%),
+      var(--bg);
+    color:var(--cream);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
     display:flex; justify-content:center; overscroll-behavior:none; touch-action:manipulation;
   }
   #app{width:100%; max-width:520px; min-height:100%; display:flex; flex-direction:column;}
 
-  .hud{display:flex; align-items:center; gap:8px; padding:max(14px,env(safe-area-inset-top)) 16px 8px;}
-  .hud .title{font-size:20px; font-weight:600; letter-spacing:.5px; flex:1;}
-  .stat{text-align:center; min-width:54px;}
-  .stat .v{font-size:18px; font-weight:600;}
-  .stat .k{font-size:10px; letter-spacing:1.5px; text-transform:uppercase; opacity:.5;}
-  .stat .v.bank{color:#e3c878;}
+  .hud{display:flex; align-items:center; gap:10px; padding:max(14px,env(safe-area-inset-top)) 16px 10px;
+       border-bottom:1px solid #2a0820;}
+  .hud .title{
+    font-size:22px; font-weight:900; letter-spacing:2px; flex:1; text-transform:uppercase;
+    background:linear-gradient(180deg,var(--gold2),var(--gold) 60%,#b88a1a);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    text-shadow:0 0 12px rgba(255,170,60,.35);
+  }
+  .stat{text-align:center; min-width:64px;}
+  .stat .v{font-size:17px; font-weight:800; font-variant-numeric:tabular-nums;}
+  .stat .k{font-size:9px; letter-spacing:2px; text-transform:uppercase; opacity:.55; margin-top:2px;}
+  .stat .v.bank{color:var(--gold); text-shadow:0 0 10px rgba(255,204,51,.55);}
+  .stat .v.streak{color:var(--neon); text-shadow:0 0 8px rgba(57,255,158,.45);}
+  .stat .v.high{color:var(--cream);}
+  @keyframes pulse{0%,100%{opacity:.55;}50%{opacity:1;}}
+  .stat .k{animation:pulse 3s ease-in-out infinite;}
 
-  .prompt{text-align:center; padding:4px 16px 2px; min-height:42px;}
-  .prompt .t{font-size:16px; font-weight:600;}
-  .prompt .s{font-size:13px; opacity:.6; margin-top:2px; min-height:16px;}
+  .prompt{text-align:center; padding:8px 16px 4px; min-height:48px;}
+  .prompt .t{font-size:15px; font-weight:800; letter-spacing:3px; text-transform:uppercase; color:var(--gold2);}
+  .prompt .s{font-size:12px; opacity:.65; margin-top:4px; min-height:16px; letter-spacing:.5px;}
 
-  .boardwrap{flex:1; display:flex; align-items:center; justify-content:center; padding:6px 14px;}
-  canvas{width:100%; height:auto; touch-action:none; border-radius:8px;}
+  .boardwrap{flex:1; display:flex; align-items:center; justify-content:center; padding:6px 14px;
+             filter:drop-shadow(0 0 22px rgba(255,170,60,.18));}
+  canvas{width:100%; height:auto; touch-action:none; border-radius:10px;
+         box-shadow:0 0 0 2px #5a3a10, 0 0 0 4px #2a1808, 0 14px 40px rgba(0,0,0,.6);}
 
   .controls{padding:8px 16px max(18px,env(safe-area-inset-bottom));}
-  .stakerow{display:flex; align-items:center; justify-content:center; gap:14px; margin-bottom:12px; font-size:14px; opacity:.9;}
-  .stakerow button{width:40px; height:40px; border-radius:50%; border:1px solid #4c4436; background:#3a342b; color:var(--paper); font-size:22px; line-height:1; cursor:pointer;}
-  .stakerow .amt{min-width:78px; text-align:center;} .stakerow .amt b{font-size:20px; color:#e3c878;}
+  .stakerow{display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:12px;}
+  .stakerow button{
+    width:42px; height:42px; border-radius:50%;
+    border:1px solid #5a2a3a; background:linear-gradient(180deg,#2a121e,#1a0612);
+    color:var(--gold); font-size:22px; font-weight:900; line-height:1; cursor:pointer;
+    box-shadow:inset 0 1px 0 rgba(255,200,80,.18), 0 2px 6px rgba(0,0,0,.5);
+  }
+  .stakerow button:active{transform:scale(.94);}
+  .stakerow .amt{min-width:130px; text-align:center; font-size:11px; letter-spacing:2px; opacity:.6; text-transform:uppercase;}
+  .stakerow .amt b{display:block; font-size:24px; font-weight:900; color:var(--gold); letter-spacing:1px;
+                    text-shadow:0 0 10px rgba(255,204,51,.5); opacity:1; font-variant-numeric:tabular-nums;}
+  .allin{
+    border:1px solid var(--hot)!important;
+    background:linear-gradient(180deg,#ff3a5e,#a01030)!important;
+    color:#fff!important; font-size:10px!important; font-weight:900!important;
+    letter-spacing:1.5px; width:auto!important; padding:0 12px; border-radius:21px!important;
+    box-shadow:0 0 14px rgba(255,42,92,.55), inset 0 1px 0 rgba(255,255,255,.25)!important;
+  }
+
   .betrow{display:flex; gap:12px;}
   .betrow button{
-    flex:1; padding:18px 8px; border-radius:14px; font-size:17px; font-weight:600; font-family:inherit;
-    cursor:pointer; border:1px solid #4c4436; transition:transform .08s, opacity .15s;
-    display:flex; align-items:center; justify-content:center; gap:9px;
+    flex:1; padding:20px 8px; border-radius:16px; font-size:16px; font-weight:900; font-family:inherit;
+    cursor:pointer; transition:transform .08s, box-shadow .15s, opacity .15s;
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    letter-spacing:3px; text-transform:uppercase;
   }
   .betrow button:active{transform:scale(.97);}
-  .betrow button:disabled{opacity:.3;}
-  .betrow .black{background:#16140f; color:#f0ece2;}
-  .betrow .white{background:#efe9dc; color:#1c1a17;}
+  .betrow button:disabled{opacity:.28; box-shadow:none;}
+  .betrow .black{
+    background:radial-gradient(circle at 30% 25%,#3a342c,#0a0908 70%);
+    color:var(--gold2); border:2px solid var(--gold);
+    box-shadow:0 0 18px rgba(255,204,51,.35), inset 0 0 18px rgba(0,0,0,.6);
+  }
+  .betrow .white{
+    background:radial-gradient(circle at 30% 25%,#fff,#d8cbac 70%);
+    color:#1a0612; border:2px solid var(--gold);
+    box-shadow:0 0 18px rgba(255,204,51,.35), inset 0 0 18px rgba(180,150,80,.25);
+  }
   .dot{width:18px; height:18px; border-radius:50%; display:inline-block;}
-  .dot.b{background:radial-gradient(circle at 35% 30%,#5a544c,#0c0b0a);}
+  .dot.b{background:radial-gradient(circle at 35% 30%,#5a544c,#0c0b0a); box-shadow:0 0 6px rgba(0,0,0,.6);}
   .dot.w{background:radial-gradient(circle at 35% 30%,#fff,#cabfa9); border:1px solid #b3a88f;}
 
-  .nextbtn{width:100%; padding:18px; border-radius:14px; font-size:17px; font-weight:600; font-family:inherit;
-    background:#7a8c5a; color:#15170e; border:none; cursor:pointer;}
+  .nextbtn{
+    width:100%; padding:20px; border-radius:16px; font-size:16px; font-weight:900;
+    font-family:inherit; letter-spacing:3px; text-transform:uppercase;
+    background:linear-gradient(180deg,var(--gold2),var(--gold) 50%,#b8861a);
+    color:#1a0612; border:none; cursor:pointer;
+    box-shadow:0 0 22px rgba(255,204,51,.5), inset 0 1px 0 rgba(255,255,255,.4);
+  }
   .nextbtn:active{transform:scale(.98);}
   .hidden{display:none!important;}
 
-  .flash{position:fixed; left:50%; top:16%; transform:translateX(-50%);
-    background:#0009; backdrop-filter:blur(4px); padding:12px 22px; border-radius:30px;
-    font-size:16px; font-weight:600; opacity:0; transition:opacity .2s; pointer-events:none; text-align:center;}
-  .flash.show{opacity:1;} .flash.win{color:#bfe0a0;} .flash.lose{color:#e6a48c;}
-  .muteBtn{background:none;border:none;color:var(--paper);font-size:18px;opacity:.7;cursor:pointer;}
+  .flash{
+    position:fixed; left:50%; top:14%; transform:translateX(-50%) scale(.9);
+    background:rgba(10,6,16,.92); backdrop-filter:blur(6px);
+    padding:14px 28px; border-radius:36px; border:1px solid #5a2a3a;
+    font-size:20px; font-weight:900; letter-spacing:2px; text-transform:uppercase;
+    opacity:0; transition:opacity .2s, transform .25s; pointer-events:none; text-align:center;
+    font-variant-numeric:tabular-nums;
+  }
+  .flash.show{opacity:1; transform:translateX(-50%) scale(1);}
+  .flash.win{color:var(--neon); border-color:var(--neon); box-shadow:0 0 40px rgba(57,255,158,.5);}
+  .flash.lose{color:var(--hot); border-color:var(--hot); box-shadow:0 0 40px rgba(255,42,92,.5);}
+  @keyframes shake{0%,100%{transform:translateX(-50%) scale(1);}25%{transform:translateX(calc(-50% - 8px)) scale(1);}75%{transform:translateX(calc(-50% + 8px)) scale(1);}}
+  .flash.lose.show{animation:shake .3s ease-in-out;}
+
+  .muteBtn{background:none;border:none;color:var(--gold);font-size:18px;opacity:.6;cursor:pointer;}
 </style>
 </head>
 <body>
 <div id="app">
   <div class="hud">
     <div class="title">Baduk Blitz</div>
-    <div class="stat"><div class="v bank" id="bank">100</div><div class="k">Stones</div></div>
-    <div class="stat"><div class="v" id="level">1</div><div class="k">Level</div></div>
-    <div class="stat"><div class="v" id="best">100</div><div class="k">Best</div></div>
+    <div class="stat"><div class="v bank" id="bank">$10,000</div><div class="k">Bank</div></div>
+    <div class="stat"><div class="v streak" id="level">1</div><div class="k">Streak</div></div>
+    <div class="stat"><div class="v high" id="best">$10,000</div><div class="k">High</div></div>
     <button class="muteBtn" id="muteBtn">♪</button>
   </div>
 
   <div class="prompt">
-    <div class="t" id="pTitle">Who wins?</div>
-    <div class="s" id="pSub">White carries 0.5 komi. Read the board, then bet.</div>
+    <div class="t" id="pTitle">Place your bet</div>
+    <div class="s" id="pSub">White spots 0.5 komi. Read the table, pick your side.</div>
   </div>
 
   <div class="boardwrap"><canvas id="board"></canvas></div>
@@ -81,15 +141,16 @@
     <div id="betPanel">
       <div class="stakerow">
         <button id="stakeDown">−</button>
-        <div class="amt">Stake <b id="stakeVal">10</b></div>
+        <div class="amt">Stake <b id="stakeVal">$500</b></div>
         <button id="stakeUp">+</button>
+        <button id="allIn" class="allin">All In</button>
       </div>
       <div class="betrow">
         <button class="black" id="betBlack"><span class="dot b"></span> Black</button>
         <button class="white" id="betWhite"><span class="dot w"></span> White</button>
       </div>
     </div>
-    <button class="nextbtn hidden" id="nextBtn">Next board ›</button>
+    <button class="nextbtn hidden" id="nextBtn">Deal next hand ›</button>
   </div>
 </div>
 <div class="flash" id="flash"></div>
@@ -97,19 +158,17 @@
 <script>
 "use strict";
 /* ============================================================
-   Baduk Blitz — v0.2 prototype
+   Baduk Blitz — v0.3 (high-stakes vibe)
    Bet which side wins a randomly generated Go board; the board
    auto-plays itself and the territory is counted to decide.
-   Self-contained: rules engine + board generator + rollout bot
-   + area scoring + betting reveal. No build, no deps, no fetches.
    ============================================================ */
 
 const EMPTY=0, BLACK=1, WHITE=2;
-const N=9;                 // board size
-const KOMI=0.5;            // to White, breaks ties
+const N=9;
+const KOMI=0.5;
 const opp=c=>c===BLACK?WHITE:BLACK;
 
-/* ---------- Go rules engine (reused from v0.1) ---------- */
+/* ---------- Go rules engine ---------- */
 const inb=(c,r)=>r>=0&&r<N&&c>=0&&c<N;
 const nbrs=(c,r)=>[[c+1,r],[c-1,r],[c,r+1],[c,r-1]];
 function clone(b){return b.map(row=>row.slice());}
@@ -128,13 +187,12 @@ function tryPlay(b,c,r,colour,koKey){
   const nb=clone(b); nb[r][c]=colour; const o=opp(colour); let captured=[];
   for(const [nx,ny] of nbrs(c,r)){ if(inb(nx,ny)&&nb[ny][nx]===o){ const g=group(nb,nx,ny);
     if(g.libs.size===0){ g.stones.forEach(([x,y])=>{nb[y][x]=EMPTY;captured.push([x,y]);}); } } }
-  if(captured.length===0 && group(nb,c,r).libs.size===0) return {ok:false};   // suicide
-  if(koKey && boardKey(nb)===koKey) return {ok:false};                         // ko
+  if(captured.length===0 && group(nb,c,r).libs.size===0) return {ok:false};
+  if(koKey && boardKey(nb)===koKey) return {ok:false};
   return {ok:true, board:nb, captured};
 }
 
-/* ---------- Auto-play bot (eye-aware random rollout) ---------- */
-// A point is "eye-ish" for colour if every on-board orthogonal neighbour is that colour.
+/* ---------- Auto-play bot ---------- */
 function isEyeish(b,c,r,colour){
   for(const [nx,ny] of nbrs(c,r)){ if(inb(nx,ny) && b[ny][nx]!==colour) return false; }
   return true;
@@ -143,14 +201,13 @@ function legalMoves(b,colour,koKey){
   const out=[];
   for(let r=0;r<N;r++) for(let c=0;c<N;c++){
     if(b[r][c]!==EMPTY) continue;
-    if(isEyeish(b,c,r,colour)) continue;          // don't fill own eyes → groups live
+    if(isEyeish(b,c,r,colour)) continue;
     if(tryPlay(b,c,r,colour,koKey).ok) out.push([c,r]);
   }
   return out;
 }
 function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=(Math.random()*(i+1))|0; [a[i],a[j]]=[a[j],a[i]]; } return a; }
 
-// Play a board to completion from sideToMove. Returns array of {b,move,cap} steps (incl. start).
 function playOut(start, sideToMove, koKey){
   let b=clone(start), side=sideToMove, ko=koKey||null;
   const steps=[{b:clone(b), move:null, cap:0}];
@@ -162,16 +219,16 @@ function playOut(start, sideToMove, koKey){
     const [c,r]=moves[0];
     const prevKey=boardKey(b);
     const res=tryPlay(b,c,r,side,ko);
-    b=res.board; ko=res.captured.length===1?prevKey:null;   // simple ko guard
+    b=res.board; ko=res.captured.length===1?prevKey:null;
     steps.push({b:clone(b), move:[c,r,side], cap:res.captured.length});
     side=opp(side);
   }
   return steps;
 }
 
-/* ---------- Area (Chinese) scoring ---------- */
+/* ---------- Area scoring ---------- */
 function score(b){
-  let bl=0, wh=0; const owner=emptyBoard().map(r=>r.map(()=>-1)); // -1 unknown, 0 dame
+  let bl=0, wh=0; const owner=emptyBoard().map(r=>r.map(()=>-1));
   for(let r=0;r<N;r++) for(let c=0;c<N;c++){ if(b[r][c]===BLACK) bl++; else if(b[r][c]===WHITE) wh++; }
   const seen=new Set();
   for(let r=0;r<N;r++) for(let c=0;c<N;c++){
@@ -189,20 +246,18 @@ function score(b){
 }
 
 /* ---------- Round generation ---------- */
-const HANDI_PTS=[[2,2],[6,6],[2,6],[6,2],[4,4],[4,2],[4,6],[2,4],[6,4]]; // 9×9 spread
-function handicapFor(level){ return Math.max(1, 8-(level-1)); }          // 8 → 1 (floor keeps a readable edge)
+const HANDI_PTS=[[2,2],[6,6],[2,6],[6,2],[4,4],[4,2],[4,6],[2,4],[6,4]];
+function handicapFor(level){ return Math.max(1, 8-(level-1)); }
 
 function genRound(level){
   const handi=handicapFor(level);
   const fav = Math.random()<0.5?BLACK:WHITE;
   let b=emptyBoard();
   shuffle(HANDI_PTS.slice()).slice(0,handi).forEach(([c,r])=>{ b[r][c]=fav; });
-  // underdog moves first as light compensation
   const steps=playOut(b, opp(fav), null);
   const finalB=steps[steps.length-1].b;
   const sc=score(finalB);
   const winner = sc.blackTotal>sc.whiteTotal?BLACK:WHITE;
-  // reveal at a dense-but-not-finished point
   const target=Math.floor(0.60*N*N);
   let idx=1; while(idx<steps.length-1 && filled(steps[idx].b)<target) idx++;
   if(steps.length-1-idx<8) idx=Math.max(1, steps.length-1-12);
@@ -219,22 +274,32 @@ function tone(f,t0,dur,type="sine",g=.16){ const a=ac(); if(!a||muted) return;
   gn.gain.exponentialRampToValueAtTime(.0001,t0+dur); o.connect(gn).connect(a.destination); o.start(t0); o.stop(t0+dur+.02); }
 const sndClack =()=>{ const a=ac(); if(a) tone(180,a.currentTime,.05,"triangle",.10); };
 const sndCap   =()=>{ const a=ac(); if(a){ tone(150,a.currentTime,.16,"sine",.16); tone(75,a.currentTime+.02,.2,"triangle",.1);} };
-const sndWin   =()=>{ const a=ac(); if(a)[523.25,659.25,783.99,1046.5].forEach((f,i)=>tone(f,a.currentTime+i*.09,.45,"sine",.16)); };
-const sndLose  =()=>{ const a=ac(); if(a){ tone(330,a.currentTime,.2,"sine",.13); tone(247,a.currentTime+.12,.28,"sine",.12);} };
+const sndWin   =()=>{ const a=ac(); if(a){
+  [523.25,659.25,783.99,1046.5,1318.5].forEach((f,i)=>tone(f,a.currentTime+i*.07,.4,"triangle",.18));
+  tone(2093,a.currentTime+.35,.5,"sine",.12);
+}};
+const sndLose  =()=>{ const a=ac(); if(a){ tone(330,a.currentTime,.2,"sawtooth",.14); tone(220,a.currentTime+.12,.32,"sawtooth",.13); tone(110,a.currentTime+.28,.4,"triangle",.12);} };
+const sndChip  =()=>{ const a=ac(); if(a) tone(900,a.currentTime,.04,"square",.08); };
 
 /* ---------- State ---------- */
 const cv=document.getElementById("board"), ctx=cv.getContext("2d");
-let bank=+(localStorage.getItem("bb_bank")||100);
-let level=+(localStorage.getItem("bb_level")||1);
-let best=+(localStorage.getItem("bb_best")||100);
-let stake=10;
-let round=null, board=null, showOwner=null, lastMove=null, phase="bet"; // bet | playing | done
+const START_BANK=10000, MIN_STAKE=100, STAKE_STEP=100;
+let bank=+(localStorage.getItem("bb3_bank")||START_BANK);
+let level=+(localStorage.getItem("bb3_level")||1);
+let best=+(localStorage.getItem("bb3_best")||START_BANK);
+let stake=Math.min(500, bank);
+let round=null, board=null, showOwner=null, lastMove=null, phase="bet";
 let geom={pad:0,cell:0,size:0};
 
-function save(){ localStorage.setItem("bb_bank",bank); localStorage.setItem("bb_level",level); localStorage.setItem("bb_best",best); }
-function syncHud(){ document.getElementById("bank").textContent=bank;
-  document.getElementById("level").textContent=level; document.getElementById("best").textContent=best;
-  document.getElementById("stakeVal").textContent=stake; }
+const fmt = n => '$' + Math.round(n).toLocaleString('en-US');
+
+function save(){ localStorage.setItem("bb3_bank",bank); localStorage.setItem("bb3_level",level); localStorage.setItem("bb3_best",best); }
+function syncHud(){
+  document.getElementById("bank").textContent=fmt(bank);
+  document.getElementById("level").textContent=level;
+  document.getElementById("best").textContent=fmt(best);
+  document.getElementById("stakeVal").textContent=fmt(stake);
+}
 
 /* ---------- Geometry & render ---------- */
 function resize(){
@@ -248,23 +313,22 @@ const xy=(c,r)=>[geom.pad+c*geom.cell, geom.pad+r*geom.cell];
 function draw(){
   const {pad,cell,size}=geom; if(!size) return;
   const g=ctx.createLinearGradient(0,0,size,size);
-  g.addColorStop(0,"#ddb56b"); g.addColorStop(1,"#c89a4e"); ctx.fillStyle=g; ctx.fillRect(0,0,size,size);
-  // territory shading (on reveal)
+  g.addColorStop(0,"#e6c078"); g.addColorStop(1,"#b88636"); ctx.fillStyle=g; ctx.fillRect(0,0,size,size);
   if(showOwner){ for(let r=0;r<N;r++) for(let c=0;c<N;c++){ const o=showOwner[r][c];
-    if(o===BLACK||o===WHITE){ const [x,y]=xy(c,r); ctx.fillStyle = o===BLACK?"rgba(20,18,14,.32)":"rgba(250,247,238,.42)";
+    if(o===BLACK||o===WHITE){ const [x,y]=xy(c,r); ctx.fillStyle = o===BLACK?"rgba(20,18,14,.34)":"rgba(250,247,238,.44)";
       ctx.fillRect(x-cell/2,y-cell/2,cell,cell); } } }
-  ctx.strokeStyle="rgba(70,52,20,.85)"; ctx.lineWidth=Math.max(1,cell*0.03);
+  ctx.strokeStyle="rgba(60,42,12,.9)"; ctx.lineWidth=Math.max(1,cell*0.03);
   for(let i=0;i<N;i++){ let [x0,y0]=xy(i,0),[x1,y1]=xy(i,N-1); ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x1,y1);ctx.stroke();
     let [a0,b0]=xy(0,i),[a1,b1]=xy(N-1,i); ctx.beginPath();ctx.moveTo(a0,b0);ctx.lineTo(a1,b1);ctx.stroke(); }
   for(const [c,r] of [[2,2],[6,6],[2,6],[6,2],[4,4]]){ const [sx,sy]=xy(c,r);
-    ctx.fillStyle="rgba(70,52,20,.8)"; ctx.beginPath(); ctx.arc(sx,sy,Math.max(2,cell*0.05),0,7); ctx.fill(); }
+    ctx.fillStyle="rgba(60,42,12,.85)"; ctx.beginPath(); ctx.arc(sx,sy,Math.max(2,cell*0.05),0,7); ctx.fill(); }
   for(let r=0;r<N;r++) for(let c=0;c<N;c++) if(board[r][c]!==EMPTY) stone(c,r,board[r][c]);
   if(lastMove){ const [mx,my]=xy(lastMove[0],lastMove[1]);
-    ctx.strokeStyle=board[lastMove[1]][lastMove[0]]===BLACK?"rgba(246,242,233,.9)":"rgba(28,26,23,.75)";
-    ctx.lineWidth=cell*0.05; ctx.beginPath(); ctx.arc(mx,my,cell*0.16,0,7); ctx.stroke(); }
+    ctx.strokeStyle=board[lastMove[1]][lastMove[0]]===BLACK?"rgba(255,204,51,.95)":"rgba(255,42,92,.9)";
+    ctx.lineWidth=cell*0.06; ctx.beginPath(); ctx.arc(mx,my,cell*0.17,0,7); ctx.stroke(); }
 }
 function stone(c,r,colour){ const {cell}=geom,[x,y]=xy(c,r),rad=cell*0.46;
-  ctx.beginPath(); ctx.arc(x+rad*0.15,y+rad*0.2,rad,0,7); ctx.fillStyle="rgba(0,0,0,.18)"; ctx.fill();
+  ctx.beginPath(); ctx.arc(x+rad*0.15,y+rad*0.2,rad,0,7); ctx.fillStyle="rgba(0,0,0,.22)"; ctx.fill();
   const gr=ctx.createRadialGradient(x-rad*0.35,y-rad*0.4,rad*0.1,x,y,rad);
   if(colour===BLACK){ gr.addColorStop(0,"#56504a"); gr.addColorStop(.45,"#26231f"); gr.addColorStop(1,"#0c0b0a"); }
   else { gr.addColorStop(0,"#fff"); gr.addColorStop(.5,"#f1ece0"); gr.addColorStop(1,"#cabfa9"); }
@@ -272,23 +336,33 @@ function stone(c,r,colour){ const {cell}=geom,[x,y]=xy(c,r),rad=cell*0.46;
 }
 
 /* ---------- Flow ---------- */
+function clampStake(){
+  const max=Math.max(MIN_STAKE, bank);
+  stake = Math.min(max, Math.max(MIN_STAKE, stake));
+  if(stake>bank) stake=bank;
+}
 function newRound(){
   round=genRound(level);
   board=clone(round.steps[round.revealIdx].b);
   showOwner=null; lastMove=null; phase="bet";
-  document.getElementById("pTitle").textContent="Who wins?";
-  document.getElementById("pSub").textContent="White carries "+KOMI+" komi. Read the board, then bet.";
+  document.getElementById("pTitle").textContent="Place your bet";
+  document.getElementById("pSub").textContent="White spots 0.5 komi. Read the table, pick your side.";
   document.getElementById("betPanel").classList.remove("hidden");
   document.getElementById("nextBtn").classList.add("hidden");
-  setBet(true); stake=Math.min(stake, Math.max(5,bank)); syncHud(); resize();
+  setBet(true); clampStake(); syncHud(); resize();
 }
-function setBet(on){ document.getElementById("betBlack").disabled=!on; document.getElementById("betWhite").disabled=!on;
-  document.getElementById("stakeUp").disabled=!on; document.getElementById("stakeDown").disabled=!on; }
+function setBet(on){
+  document.getElementById("betBlack").disabled=!on;
+  document.getElementById("betWhite").disabled=!on;
+  document.getElementById("stakeUp").disabled=!on;
+  document.getElementById("stakeDown").disabled=!on;
+  document.getElementById("allIn").disabled=!on;
+}
 
 function placeBet(side){
   if(phase!=="bet") return; ac(); phase="playing"; setBet(false);
-  document.getElementById("pTitle").textContent="Playing it out…";
-  document.getElementById("pSub").textContent="You backed "+(side===BLACK?"Black":"White")+" for "+stake+".";
+  document.getElementById("pTitle").textContent="Rolling…";
+  document.getElementById("pSub").textContent=fmt(stake)+" on "+(side===BLACK?"Black":"White")+". Dealer's playing it out.";
   const steps=round.steps; let i=round.revealIdx;
   const tick=()=>{
     i++;
@@ -306,18 +380,18 @@ function reveal(side){
   const win=side===round.winner;
   const wName=round.winner===BLACK?"Black":"White";
   const bt=sc.blackTotal, wt=sc.whiteTotal, margin=Math.abs(bt-wt);
-  document.getElementById("pTitle").textContent=wName+" wins by "+margin.toFixed(1);
+  document.getElementById("pTitle").textContent=wName+" takes it by "+margin.toFixed(1);
   document.getElementById("pSub").textContent="Black "+bt+"  ·  White "+wt.toFixed(1)+"  (incl. "+KOMI+" komi)";
-  if(win){ bank+=stake; sndWin(); flash("You win  +"+stake,"win"); }
-  else   { bank-=stake; sndLose(); flash("You lose  −"+stake,"lose"); }
+  if(win){ bank+=stake; sndWin(); flash("Jackpot  +"+fmt(stake),"win"); }
+  else   { bank-=stake; sndLose(); flash("Busted  −"+fmt(stake),"lose"); }
   level++; best=Math.max(best,bank); save(); syncHud();
   const nb=document.getElementById("nextBtn");
   document.getElementById("betPanel").classList.add("hidden"); nb.classList.remove("hidden");
-  if(bank<5){ nb.textContent="Out of stones — start over"; }
-  else { nb.textContent="Next board ›"; }
+  if(bank<MIN_STAKE){ nb.textContent="Tapped out — buy in again"; }
+  else { nb.textContent="Deal next hand ›"; }
 }
 function nextBoard(){
-  if(bank<5){ bank=100; level=1; best=Math.max(best,bank); save(); }
+  if(bank<MIN_STAKE){ bank=START_BANK; level=1; best=Math.max(best,bank); save(); }
   newRound();
 }
 
@@ -325,12 +399,13 @@ function nextBoard(){
 document.getElementById("betBlack").onclick=()=>placeBet(BLACK);
 document.getElementById("betWhite").onclick=()=>placeBet(WHITE);
 document.getElementById("nextBtn").onclick=nextBoard;
-document.getElementById("stakeUp").onclick=()=>{ stake=Math.min(Math.max(5,bank), stake+5); syncHud(); };
-document.getElementById("stakeDown").onclick=()=>{ stake=Math.max(5, stake-5); syncHud(); };
-document.getElementById("muteBtn").onclick=e=>{ muted=!muted; e.target.style.opacity=muted?.3:.7; e.target.textContent=muted?"♪̸":"♪"; if(!muted) ac(); };
+document.getElementById("stakeUp").onclick=()=>{ stake=Math.min(bank, stake+STAKE_STEP); sndChip(); syncHud(); };
+document.getElementById("stakeDown").onclick=()=>{ stake=Math.max(MIN_STAKE, stake-STAKE_STEP); sndChip(); syncHud(); };
+document.getElementById("allIn").onclick=()=>{ stake=Math.max(MIN_STAKE, bank); sndChip(); syncHud(); };
+document.getElementById("muteBtn").onclick=e=>{ muted=!muted; e.target.style.opacity=muted?.25:.6; e.target.textContent=muted?"♪̸":"♪"; if(!muted) ac(); };
 let flashT=null;
 function flash(msg,kind){ const f=document.getElementById("flash"); f.textContent=msg; f.className="flash show "+(kind||"");
-  clearTimeout(flashT); flashT=setTimeout(()=>f.classList.remove("show"),1500); }
+  clearTimeout(flashT); flashT=setTimeout(()=>f.classList.remove("show"),1600); }
 window.addEventListener("resize",resize);
 
 syncHud(); newRound();
