@@ -168,6 +168,38 @@
     0%,100%{box-shadow:0 0 16px rgba(255,204,51,.35), inset 0 0 18px rgba(0,0,0,.35);}
     50%{box-shadow:0 0 34px rgba(255,204,51,.8), inset 0 0 18px rgba(0,0,0,.35);}
   }
+
+  .line{display:flex; align-items:center; gap:8px; padding:4px 14px 6px;}
+  .odd{flex:0 0 auto; text-align:center; min-width:62px;}
+  .odd .x{font-size:17px; font-weight:900; font-variant-numeric:tabular-nums; letter-spacing:.5px;}
+  .odd .x .m{font-size:11px; opacity:.7; margin-left:1px;}
+  .odd .lbl{font-size:9px; letter-spacing:1.5px; text-transform:uppercase; opacity:.55; margin-top:1px;}
+  .odd.b .x{color:#f0ece2;}
+  .odd.w .x{color:#f0ece2;}
+  .timer{flex:1; height:14px; background:rgba(255,255,255,.05); border-radius:7px;
+         position:relative; overflow:hidden; border:1px solid #2a0820;}
+  .timer .bar{height:100%; width:100%;
+              background:linear-gradient(90deg,var(--neon),var(--gold));
+              transition:width .12s linear;
+              box-shadow:0 0 12px rgba(57,255,158,.4);}
+  .timer .t{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+            font-size:10px; font-weight:900; letter-spacing:1.5px; color:var(--cream);
+            text-shadow:0 1px 2px rgba(0,0,0,.7);}
+  .timer.urgent .bar{background:linear-gradient(90deg,var(--hot),#ffaa00);
+                     box-shadow:0 0 14px rgba(255,42,92,.6);
+                     animation:urgentpulse .6s ease-in-out infinite;}
+  .timer.locked .bar{background:linear-gradient(90deg,var(--gold2),var(--gold));}
+  @keyframes urgentpulse{0%,100%{opacity:1;}50%{opacity:.7;}}
+
+  .locked{
+    padding:14px 12px; border-radius:14px;
+    background:linear-gradient(180deg,rgba(255,204,51,.12),rgba(255,204,51,.04));
+    border:1px solid rgba(255,204,51,.4);
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    font-size:13px; font-weight:800; letter-spacing:1.5px; text-transform:uppercase;
+    color:var(--gold2); text-align:center;
+  }
+  .locked .lk-amt{color:var(--gold); font-variant-numeric:tabular-nums;}
 </style>
 </head>
 <body>
@@ -182,7 +214,13 @@
 
   <div class="prompt">
     <div class="t" id="pTitle">Place your bet</div>
-    <div class="s" id="pSub">White spots 0.5 komi. Read the table, pick your side.</div>
+    <div class="s" id="pSub">White spots 0.5 komi. Read the room, lock in before time runs out.</div>
+  </div>
+
+  <div class="line">
+    <div class="odd b"><div class="x"><span id="oddB">1.00</span><span class="m">×</span></div><div class="lbl">Black</div></div>
+    <div class="timer" id="timer"><div class="bar" id="timerBar"></div><div class="t" id="timerText">30s</div></div>
+    <div class="odd w"><div class="x"><span id="oddW">1.00</span><span class="m">×</span></div><div class="lbl">White</div></div>
   </div>
 
   <div class="boardwrap"><canvas id="board"></canvas></div>
@@ -205,6 +243,9 @@
         <button class="cancel" id="cancelBet">Cancel</button>
         <button class="confirm black" id="confirmBet"><span class="dot b"></span> Lock in</button>
       </div>
+    </div>
+    <div class="locked hidden" id="lockedPanel">
+      <span id="lockedText">Locked</span>
     </div>
     <button class="nextbtn hidden" id="nextBtn">Deal next hand ›</button>
   </div>
@@ -355,29 +396,61 @@ let round=null, board=null, showOwner=null, lastMove=null, phase="bet";
 let pendingSide=null;
 let geom={pad:0,cell:0,size:0};
 
-/* ---------- Table chatter (fictional bettors) ---------- */
-const PLAYERS=[
-  {name:"Big Mike",      tier:"high"},
-  {name:"Whale_88",      tier:"high"},
-  {name:"Goldie",        tier:"high"},
-  {name:"Velvet Jane",   tier:"mid"},
-  {name:"Lucky Lin",     tier:"mid"},
-  {name:"Marble Mei",    tier:"mid"},
-  {name:"Hanchan Hank",  tier:"mid"},
-  {name:"Dora",          tier:"mid"},
-  {name:"Tako",          tier:"low"},
-  {name:"Stone Cold Sam",tier:"low"},
-  {name:"Kifu Kai",      tier:"low"},
-  {name:"Jet",           tier:"low"},
+/* ---------- Patrons (persistent skill tiers, hidden) ---------- */
+const PLAYER_SEED=[
+  {name:"Big Mike",      fin:"high"},
+  {name:"Whale_88",      fin:"high"},
+  {name:"Goldie",        fin:"high"},
+  {name:"Velvet Jane",   fin:"mid"},
+  {name:"Lucky Lin",     fin:"mid"},
+  {name:"Marble Mei",    fin:"mid"},
+  {name:"Hanchan Hank",  fin:"mid"},
+  {name:"Dora",          fin:"mid"},
+  {name:"Tako",          fin:"low"},
+  {name:"Stone Cold Sam",fin:"low"},
+  {name:"Kifu Kai",      fin:"low"},
+  {name:"Jet",           fin:"low"},
 ];
+const SKILL_ACC={sharp:0.75, mid:0.55, fish:0.40};
+function loadPatrons(){
+  try{
+    const saved=JSON.parse(localStorage.getItem("bb3_patrons")||"null");
+    if(Array.isArray(saved) && saved.length===PLAYER_SEED.length) return saved;
+  }catch(e){}
+  // assign skill: 20% sharp, 50% mid, 30% fish
+  const out=PLAYER_SEED.map(p=>{
+    const r=Math.random();
+    const skill=r<0.20?"sharp":r<0.70?"mid":"fish";
+    return {name:p.name, fin:p.fin, skill};
+  });
+  localStorage.setItem("bb3_patrons", JSON.stringify(out));
+  return out;
+}
+const PATRONS=loadPatrons();
 function pick(a){ return a[(Math.random()*a.length)|0]; }
-function rngStake(tier){
-  if(tier==="high") return pick([2500,5000,10000,15000,25000,40000]);
-  if(tier==="mid")  return pick([500,800,1500,2500,4000]);
+function rngStake(fin){
+  if(fin==="high") return pick([2500,5000,10000,15000,25000,40000]);
+  if(fin==="mid")  return pick([500,800,1500,2500,4000]);
   return pick([100,200,300,500,800]);
 }
-let tableBets=[];          // {name, side, stake} placed during current bet phase
-let chatterTimer=null;
+
+/* ---------- Pool & odds ---------- */
+const SEED=5000, RAKE=0.95;
+let pool={black:SEED, white:SEED};
+let tableBets=[];          // {name, side, stake, skill} placed by patrons this round
+let playerLock=null;       // {side, stake, odds, payout}
+function oddsFor(side){
+  const total=pool.black+pool.white;
+  const on = side===BLACK ? pool.black : pool.white;
+  return RAKE * total / on;
+}
+function updateOdds(){
+  document.getElementById("oddB").textContent=oddsFor(BLACK).toFixed(2);
+  document.getElementById("oddW").textContent=oddsFor(WHITE).toFixed(2);
+  refreshConfirmLabel();
+}
+
+/* ---------- Feed ---------- */
 function pushFeed(html, kind){
   const el=document.getElementById("feed");
   const line=document.createElement("div");
@@ -387,25 +460,26 @@ function pushFeed(html, kind){
   while(el.children.length>4) el.removeChild(el.firstChild);
 }
 function clearFeed(){ document.getElementById("feed").innerHTML=""; }
+
+/* ---------- Patron betting (uses real winner via skill model) ---------- */
+function patronPlacesBet(){
+  if(!round) return;
+  const p=pick(PATRONS);
+  const correct=Math.random() < SKILL_ACC[p.skill];
+  const side = correct ? round.winner : opp(round.winner);
+  const stake = rngStake(p.fin);
+  pool[side===BLACK?"black":"white"] += stake;
+  tableBets.push({name:p.name, side, stake, skill:p.skill});
+  pushFeed(`<span class="who">${p.name}</span> drops ${fmt(stake)} on ${side===BLACK?"Black":"White"}`, "bet");
+  updateOdds();
+}
+let chatterTimer=null;
 function chatterTick(){
   if(phase!=="bet") return;
-  const p=pick(PLAYERS);
-  const r=Math.random();
-  if(r<0.7){
-    const side=Math.random()<0.5?BLACK:WHITE;
-    const s=rngStake(p.tier);
-    tableBets.push({name:p.name, side, stake:s});
-    pushFeed(`<span class="who">${p.name}</span> drops ${fmt(s)} on ${side===BLACK?"Black":"White"}`, "bet");
-  } else {
-    const win=Math.random()<0.5;
-    const s=rngStake(p.tier);
-    pushFeed(win
-      ? `<span class="who">${p.name}</span> cashes out +${fmt(s)}`
-      : `<span class="who">${p.name}</span> busts −${fmt(s)}`, win?"win":"lose");
-  }
-  chatterTimer=setTimeout(chatterTick, 700+Math.random()*1800);
+  patronPlacesBet();
+  chatterTimer=setTimeout(chatterTick, 900+Math.random()*1700);
 }
-function startChatter(){ stopChatter(); chatterTimer=setTimeout(chatterTick, 350); }
+function startChatter(){ stopChatter(); chatterTimer=setTimeout(chatterTick, 600); }
 function stopChatter(){ if(chatterTimer){ clearTimeout(chatterTimer); chatterTimer=null; } }
 function resolveTableBets(winner){
   const sample=tableBets.slice().sort(()=>Math.random()-0.5).slice(0,4);
@@ -418,6 +492,34 @@ function resolveTableBets(winner){
     }, 450+i*500);
   });
   tableBets=[];
+}
+
+/* ---------- Timer ---------- */
+const TIMER_MS=30000;
+let timerEnds=0, timerTimer=null;
+function startTimer(){
+  stopTimer();
+  timerEnds=Date.now()+TIMER_MS;
+  const el=document.getElementById("timer");
+  el.classList.remove("urgent","locked");
+  const tick=()=>{
+    if(phase!=="bet"){ return; }
+    const ms=Math.max(0, timerEnds-Date.now());
+    const pct=ms/TIMER_MS*100;
+    document.getElementById("timerBar").style.width=pct+"%";
+    document.getElementById("timerText").textContent=Math.ceil(ms/1000)+"s";
+    if(ms<=5000) el.classList.add("urgent");
+    if(ms<=0){ timerExpired(); return; }
+    timerTimer=setTimeout(tick, 100);
+  };
+  tick();
+}
+function stopTimer(){ if(timerTimer){ clearTimeout(timerTimer); timerTimer=null; } }
+function timerExpired(){
+  if(playerLock) return;
+  stopChatter();
+  // sit-out: jump straight into the play-out, no bet
+  startPlayout(null);
 }
 
 const fmt = n => '$' + Math.round(n).toLocaleString('en-US');
@@ -475,16 +577,26 @@ function showChoice(){
   document.getElementById("confirmRow").classList.add("hidden");
   pendingSide=null;
 }
+function refreshConfirmLabel(){
+  if(pendingSide===null) return;
+  const btn=document.getElementById("confirmBet");
+  const o=oddsFor(pendingSide), payout=Math.round(stake*o);
+  btn.innerHTML=`<span class="dot ${pendingSide===BLACK?"b":"w"}"></span> Lock in ${fmt(stake)} @ ${o.toFixed(2)}× → ${fmt(payout)}`;
+}
 function newRound(){
   round=genRound(level);
   board=clone(round.steps[round.revealIdx].b);
   showOwner=null; lastMove=null; phase="bet";
+  pool={black:SEED, white:SEED};
+  playerLock=null; tableBets=[];
   document.getElementById("pTitle").textContent="Place your bet";
-  document.getElementById("pSub").textContent="White spots 0.5 komi. Read the table, pick your side.";
+  document.getElementById("pSub").textContent="Read the room. Line shifts as patrons lock in. White spots 0.5 komi.";
   document.getElementById("betPanel").classList.remove("hidden");
+  document.getElementById("lockedPanel").classList.add("hidden");
   document.getElementById("nextBtn").classList.add("hidden");
   showChoice(); setBet(true); clampStake(); syncHud(); resize();
-  clearFeed(); tableBets=[]; startChatter();
+  clearFeed(); updateOdds();
+  startChatter(); startTimer();
 }
 function setBet(on){
   document.getElementById("betBlack").disabled=!on;
@@ -500,26 +612,52 @@ function chooseBet(side){
   if(phase!=="bet") return; ac();
   pendingSide=side;
   document.getElementById("betChoice").classList.add("hidden");
-  const row=document.getElementById("confirmRow"); row.classList.remove("hidden");
-  const btn=document.getElementById("confirmBet");
-  btn.className="confirm "+(side===BLACK?"black":"white");
-  btn.innerHTML=`<span class="dot ${side===BLACK?"b":"w"}"></span> Lock in ${fmt(stake)}`;
+  document.getElementById("confirmRow").classList.remove("hidden");
+  document.getElementById("confirmBet").className="confirm "+(side===BLACK?"black":"white");
+  refreshConfirmLabel();
   sndChip();
 }
 function cancelBet(){ if(phase!=="bet") return; showChoice(); sndChip(); }
 function confirmBet(){
   if(phase!=="bet" || pendingSide===null) return;
-  const side=pendingSide; placeBet(side);
+  lockInBet(pendingSide);
 }
 
-function placeBet(side){
-  if(phase!=="bet") return; ac(); phase="playing"; setBet(false);
-  stopChatter();
-  document.getElementById("betChoice").classList.add("hidden");
-  document.getElementById("confirmRow").classList.add("hidden");
+function lockInBet(side){
+  ac(); stopTimer(); stopChatter();
   pendingSide=null;
+  const odds=oddsFor(side);
+  const payout=Math.round(stake*odds);
+  playerLock={side, stake, odds, payout};
+  pool[side===BLACK?"black":"white"] += stake;
+  updateOdds();
+  // swap controls
+  document.getElementById("betPanel").classList.add("hidden");
+  const lp=document.getElementById("lockedPanel"); lp.classList.remove("hidden");
+  document.getElementById("lockedText").innerHTML=
+    `Locked <span class="lk-amt">${fmt(stake)}</span> on ${side===BLACK?"Black":"White"} @ ${odds.toFixed(2)}× → <span class="lk-amt">${fmt(payout)}</span>`;
+  document.getElementById("pTitle").textContent="Locked in";
+  document.getElementById("pSub").textContent="Watching the rest of the room…";
+  const tEl=document.getElementById("timer");
+  tEl.classList.remove("urgent"); tEl.classList.add("locked");
+  // fast-forward the room: ~2.5s of rapid patron bets
+  let fired=0, target=6+((Math.random()*4)|0);
+  const ff=()=>{
+    if(fired>=target){ setTimeout(()=>startPlayout(side), 350); return; }
+    patronPlacesBet(); fired++;
+    setTimeout(ff, 240+Math.random()*180);
+  };
+  ff();
+}
+
+function startPlayout(side){
+  phase="playing"; setBet(false); stopChatter(); stopTimer();
   document.getElementById("pTitle").textContent="Rolling…";
-  document.getElementById("pSub").textContent=fmt(stake)+" on "+(side===BLACK?"Black":"White")+". Dealer's playing it out.";
+  document.getElementById("pSub").textContent= side===null
+    ? "Sat this one out. Watching the result."
+    : "Dealer's playing it out.";
+  document.getElementById("timerBar").style.width="0%";
+  document.getElementById("timerText").textContent="";
   const steps=round.steps; let i=round.revealIdx;
   const tick=()=>{
     i++;
@@ -534,17 +672,23 @@ function placeBet(side){
 function reveal(side){
   phase="done"; const sc=round.sc; board=round.steps[round.steps.length-1].b;
   showOwner=sc.owner; lastMove=null; draw();
-  const win=side===round.winner;
   const wName=round.winner===BLACK?"Black":"White";
   const bt=sc.blackTotal, wt=sc.whiteTotal, margin=Math.abs(bt-wt);
   document.getElementById("pTitle").textContent=wName+" takes it by "+margin.toFixed(1);
   document.getElementById("pSub").textContent="Black "+bt+"  ·  White "+wt.toFixed(1)+"  (incl. "+KOMI+" komi)";
-  if(win){ bank+=stake; sndWin(); flash("Jackpot  +"+fmt(stake),"win"); }
-  else   { bank-=stake; sndLose(); flash("Busted  −"+fmt(stake),"lose"); }
+  if(playerLock){
+    const win=playerLock.side===round.winner;
+    if(win){ bank+=playerLock.payout; sndWin(); flash("Jackpot  +"+fmt(playerLock.payout),"win"); }
+    else   { bank-=playerLock.stake;  sndLose(); flash("Busted  −"+fmt(playerLock.stake),"lose"); }
+  } else {
+    flash("Sat it out","lose");
+  }
   level++; best=Math.max(best,bank); save(); syncHud();
   resolveTableBets(round.winner);
   const nb=document.getElementById("nextBtn");
-  document.getElementById("betPanel").classList.add("hidden"); nb.classList.remove("hidden");
+  document.getElementById("betPanel").classList.add("hidden");
+  document.getElementById("lockedPanel").classList.add("hidden");
+  nb.classList.remove("hidden");
   if(bank<MIN_STAKE){ nb.textContent="Tapped out — buy in again"; }
   else { nb.textContent="Deal next hand ›"; }
 }
@@ -563,20 +707,12 @@ function bumpStake(dir){
   const step=stepFor(bank);
   if(dir>0) stake=Math.min(bank, Math.floor(stake/step)*step + step);
   else      stake=Math.max(MIN_STAKE, Math.ceil(stake/step)*step - step);
-  sndChip(); syncHud();
-  if(pendingSide!==null){
-    const btn=document.getElementById("confirmBet");
-    btn.innerHTML=`<span class="dot ${pendingSide===BLACK?"b":"w"}"></span> Lock in ${fmt(stake)}`;
-  }
+  sndChip(); syncHud(); refreshConfirmLabel();
 }
 document.getElementById("stakeUp").onclick=()=>bumpStake(1);
 document.getElementById("stakeDown").onclick=()=>bumpStake(-1);
 document.getElementById("allIn").onclick=()=>{
-  stake=Math.max(MIN_STAKE, bank); sndChip(); syncHud();
-  if(pendingSide!==null){
-    const btn=document.getElementById("confirmBet");
-    btn.innerHTML=`<span class="dot ${pendingSide===BLACK?"b":"w"}"></span> Lock in ${fmt(stake)}`;
-  }
+  stake=Math.max(MIN_STAKE, bank); sndChip(); syncHud(); refreshConfirmLabel();
 };
 document.getElementById("muteBtn").onclick=e=>{ muted=!muted; e.target.style.opacity=muted?.25:.6; e.target.textContent=muted?"♪̸":"♪"; if(!muted) ac(); };
 let flashT=null;
