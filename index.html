@@ -427,13 +427,12 @@ const sndChip  =()=>{ const a=ac(); if(a) tone(900,a.currentTime,.04,"square",.0
 
 /* ---------- State ---------- */
 const cv=document.getElementById("board"), ctx=cv.getContext("2d");
-const START_BANK=10000, MIN_STAKE=100;
+const START_BANK=10000, MIN_STAKE=1000;
 function stepFor(b){
-  if(b>=100000) return 10000;
-  if(b>=50000)  return 5000;
-  if(b>=10000)  return 1000;
-  if(b>=2000)   return 500;
-  return 100;
+  if(b>=200000) return 25000;
+  if(b>=50000)  return 10000;
+  if(b>=10000)  return 2500;
+  return 1000;
 }
 let bank=+(localStorage.getItem("bb3_bank")||START_BANK);
 let level=+(localStorage.getItem("bb3_level")||1);
