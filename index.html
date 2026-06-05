@@ -118,6 +118,54 @@
   .flash.lose.show{animation:shake .3s ease-in-out;}
 
   .muteBtn{background:none;border:none;color:var(--gold);font-size:18px;opacity:.6;cursor:pointer;}
+
+  .feed{
+    padding:6px 18px 0; min-height:56px; display:flex; flex-direction:column;
+    justify-content:flex-end; gap:3px; overflow:hidden;
+    border-top:1px solid #2a0820;
+  }
+  .feedline{
+    font-size:11px; letter-spacing:.6px; line-height:1.35;
+    animation:feedin .35s ease-out both;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    font-variant-numeric:tabular-nums;
+  }
+  .feedline .who{font-weight:800; opacity:.95;}
+  .feedline.bet{color:#c8b89a;}
+  .feedline.win{color:var(--neon); text-shadow:0 0 8px rgba(57,255,158,.4);}
+  .feedline.lose{color:var(--hot); text-shadow:0 0 8px rgba(255,42,92,.35);}
+  @keyframes feedin{
+    from{opacity:0; transform:translateY(10px);}
+    to{opacity:.9; transform:translateY(0);}
+  }
+
+  .confirmrow{display:flex; gap:10px;}
+  .confirmrow .cancel{
+    flex:0 0 92px; padding:20px 8px; border-radius:16px;
+    background:transparent; border:1px solid #5a2a3a; color:#a89a8a;
+    font-size:12px; font-weight:700; font-family:inherit; cursor:pointer;
+    letter-spacing:2px; text-transform:uppercase;
+  }
+  .confirmrow .cancel:active{transform:scale(.97);}
+  .confirmrow .confirm{
+    flex:1; padding:20px 8px; border-radius:16px; font-size:14px; font-weight:900;
+    font-family:inherit; letter-spacing:2.5px; text-transform:uppercase; cursor:pointer;
+    border:2px solid var(--gold); display:flex; align-items:center; justify-content:center; gap:10px;
+    animation:confirmpulse 1.1s ease-in-out infinite;
+  }
+  .confirmrow .confirm:active{transform:scale(.97);}
+  .confirmrow .confirm.black{
+    background:radial-gradient(circle at 30% 25%,#3a342c,#0a0908 70%);
+    color:var(--gold2);
+  }
+  .confirmrow .confirm.white{
+    background:radial-gradient(circle at 30% 25%,#fff,#d8cbac 70%);
+    color:#1a0612;
+  }
+  @keyframes confirmpulse{
+    0%,100%{box-shadow:0 0 16px rgba(255,204,51,.35), inset 0 0 18px rgba(0,0,0,.35);}
+    50%{box-shadow:0 0 34px rgba(255,204,51,.8), inset 0 0 18px rgba(0,0,0,.35);}
+  }
 </style>
 </head>
 <body>
@@ -137,17 +185,23 @@
 
   <div class="boardwrap"><canvas id="board"></canvas></div>
 
+  <div class="feed" id="feed"></div>
+
   <div class="controls">
     <div id="betPanel">
       <div class="stakerow">
         <button id="stakeDown">−</button>
-        <div class="amt">Stake <b id="stakeVal">$500</b></div>
+        <div class="amt">Stake <b id="stakeVal">$1,000</b></div>
         <button id="stakeUp">+</button>
         <button id="allIn" class="allin">All In</button>
       </div>
-      <div class="betrow">
+      <div class="betrow" id="betChoice">
         <button class="black" id="betBlack"><span class="dot b"></span> Black</button>
         <button class="white" id="betWhite"><span class="dot w"></span> White</button>
+      </div>
+      <div class="confirmrow hidden" id="confirmRow">
+        <button class="cancel" id="cancelBet">Cancel</button>
+        <button class="confirm black" id="confirmBet"><span class="dot b"></span> Lock in</button>
       </div>
     </div>
     <button class="nextbtn hidden" id="nextBtn">Deal next hand ›</button>
@@ -283,13 +337,86 @@ const sndChip  =()=>{ const a=ac(); if(a) tone(900,a.currentTime,.04,"square",.0
 
 /* ---------- State ---------- */
 const cv=document.getElementById("board"), ctx=cv.getContext("2d");
-const START_BANK=10000, MIN_STAKE=100, STAKE_STEP=100;
+const START_BANK=10000, MIN_STAKE=100;
+function stepFor(b){
+  if(b>=100000) return 10000;
+  if(b>=50000)  return 5000;
+  if(b>=10000)  return 1000;
+  if(b>=2000)   return 500;
+  return 100;
+}
 let bank=+(localStorage.getItem("bb3_bank")||START_BANK);
 let level=+(localStorage.getItem("bb3_level")||1);
 let best=+(localStorage.getItem("bb3_best")||START_BANK);
-let stake=Math.min(500, bank);
+let stake=Math.min(1000, bank);
 let round=null, board=null, showOwner=null, lastMove=null, phase="bet";
+let pendingSide=null;
 let geom={pad:0,cell:0,size:0};
+
+/* ---------- Table chatter (fictional bettors) ---------- */
+const PLAYERS=[
+  {name:"Big Mike",      tier:"high"},
+  {name:"Whale_88",      tier:"high"},
+  {name:"Goldie",        tier:"high"},
+  {name:"Velvet Jane",   tier:"mid"},
+  {name:"Lucky Lin",     tier:"mid"},
+  {name:"Marble Mei",    tier:"mid"},
+  {name:"Hanchan Hank",  tier:"mid"},
+  {name:"Dora",          tier:"mid"},
+  {name:"Tako",          tier:"low"},
+  {name:"Stone Cold Sam",tier:"low"},
+  {name:"Kifu Kai",      tier:"low"},
+  {name:"Jet",           tier:"low"},
+];
+function pick(a){ return a[(Math.random()*a.length)|0]; }
+function rngStake(tier){
+  if(tier==="high") return pick([2500,5000,10000,15000,25000,40000]);
+  if(tier==="mid")  return pick([500,800,1500,2500,4000]);
+  return pick([100,200,300,500,800]);
+}
+let tableBets=[];          // {name, side, stake} placed during current bet phase
+let chatterTimer=null;
+function pushFeed(html, kind){
+  const el=document.getElementById("feed");
+  const line=document.createElement("div");
+  line.className="feedline "+(kind||"bet");
+  line.innerHTML=html;
+  el.appendChild(line);
+  while(el.children.length>4) el.removeChild(el.firstChild);
+}
+function clearFeed(){ document.getElementById("feed").innerHTML=""; }
+function chatterTick(){
+  if(phase!=="bet") return;
+  const p=pick(PLAYERS);
+  const r=Math.random();
+  if(r<0.7){
+    const side=Math.random()<0.5?BLACK:WHITE;
+    const s=rngStake(p.tier);
+    tableBets.push({name:p.name, side, stake:s});
+    pushFeed(`<span class="who">${p.name}</span> drops ${fmt(s)} on ${side===BLACK?"Black":"White"}`, "bet");
+  } else {
+    const win=Math.random()<0.5;
+    const s=rngStake(p.tier);
+    pushFeed(win
+      ? `<span class="who">${p.name}</span> cashes out +${fmt(s)}`
+      : `<span class="who">${p.name}</span> busts −${fmt(s)}`, win?"win":"lose");
+  }
+  chatterTimer=setTimeout(chatterTick, 700+Math.random()*1800);
+}
+function startChatter(){ stopChatter(); chatterTimer=setTimeout(chatterTick, 350); }
+function stopChatter(){ if(chatterTimer){ clearTimeout(chatterTimer); chatterTimer=null; } }
+function resolveTableBets(winner){
+  const sample=tableBets.slice().sort(()=>Math.random()-0.5).slice(0,4);
+  sample.forEach((b,i)=>{
+    setTimeout(()=>{
+      const w=b.side===winner;
+      pushFeed(w
+        ? `<span class="who">${b.name}</span> cashes out +${fmt(b.stake)}`
+        : `<span class="who">${b.name}</span> busts −${fmt(b.stake)}`, w?"win":"lose");
+    }, 450+i*500);
+  });
+  tableBets=[];
+}
 
 const fmt = n => '$' + Math.round(n).toLocaleString('en-US');
 
@@ -341,6 +468,11 @@ function clampStake(){
   stake = Math.min(max, Math.max(MIN_STAKE, stake));
   if(stake>bank) stake=bank;
 }
+function showChoice(){
+  document.getElementById("betChoice").classList.remove("hidden");
+  document.getElementById("confirmRow").classList.add("hidden");
+  pendingSide=null;
+}
 function newRound(){
   round=genRound(level);
   board=clone(round.steps[round.revealIdx].b);
@@ -349,7 +481,8 @@ function newRound(){
   document.getElementById("pSub").textContent="White spots 0.5 komi. Read the table, pick your side.";
   document.getElementById("betPanel").classList.remove("hidden");
   document.getElementById("nextBtn").classList.add("hidden");
-  setBet(true); clampStake(); syncHud(); resize();
+  showChoice(); setBet(true); clampStake(); syncHud(); resize();
+  clearFeed(); tableBets=[]; startChatter();
 }
 function setBet(on){
   document.getElementById("betBlack").disabled=!on;
@@ -357,10 +490,32 @@ function setBet(on){
   document.getElementById("stakeUp").disabled=!on;
   document.getElementById("stakeDown").disabled=!on;
   document.getElementById("allIn").disabled=!on;
+  document.getElementById("confirmBet").disabled=!on;
+  document.getElementById("cancelBet").disabled=!on;
+}
+
+function chooseBet(side){
+  if(phase!=="bet") return; ac();
+  pendingSide=side;
+  document.getElementById("betChoice").classList.add("hidden");
+  const row=document.getElementById("confirmRow"); row.classList.remove("hidden");
+  const btn=document.getElementById("confirmBet");
+  btn.className="confirm "+(side===BLACK?"black":"white");
+  btn.innerHTML=`<span class="dot ${side===BLACK?"b":"w"}"></span> Lock in ${fmt(stake)}`;
+  sndChip();
+}
+function cancelBet(){ if(phase!=="bet") return; showChoice(); sndChip(); }
+function confirmBet(){
+  if(phase!=="bet" || pendingSide===null) return;
+  const side=pendingSide; placeBet(side);
 }
 
 function placeBet(side){
   if(phase!=="bet") return; ac(); phase="playing"; setBet(false);
+  stopChatter();
+  document.getElementById("betChoice").classList.add("hidden");
+  document.getElementById("confirmRow").classList.add("hidden");
+  pendingSide=null;
   document.getElementById("pTitle").textContent="Rolling…";
   document.getElementById("pSub").textContent=fmt(stake)+" on "+(side===BLACK?"Black":"White")+". Dealer's playing it out.";
   const steps=round.steps; let i=round.revealIdx;
@@ -385,6 +540,7 @@ function reveal(side){
   if(win){ bank+=stake; sndWin(); flash("Jackpot  +"+fmt(stake),"win"); }
   else   { bank-=stake; sndLose(); flash("Busted  −"+fmt(stake),"lose"); }
   level++; best=Math.max(best,bank); save(); syncHud();
+  resolveTableBets(round.winner);
   const nb=document.getElementById("nextBtn");
   document.getElementById("betPanel").classList.add("hidden"); nb.classList.remove("hidden");
   if(bank<MIN_STAKE){ nb.textContent="Tapped out — buy in again"; }
@@ -396,12 +552,30 @@ function nextBoard(){
 }
 
 /* ---------- Wire up ---------- */
-document.getElementById("betBlack").onclick=()=>placeBet(BLACK);
-document.getElementById("betWhite").onclick=()=>placeBet(WHITE);
+document.getElementById("betBlack").onclick=()=>chooseBet(BLACK);
+document.getElementById("betWhite").onclick=()=>chooseBet(WHITE);
+document.getElementById("cancelBet").onclick=cancelBet;
+document.getElementById("confirmBet").onclick=confirmBet;
 document.getElementById("nextBtn").onclick=nextBoard;
-document.getElementById("stakeUp").onclick=()=>{ stake=Math.min(bank, stake+STAKE_STEP); sndChip(); syncHud(); };
-document.getElementById("stakeDown").onclick=()=>{ stake=Math.max(MIN_STAKE, stake-STAKE_STEP); sndChip(); syncHud(); };
-document.getElementById("allIn").onclick=()=>{ stake=Math.max(MIN_STAKE, bank); sndChip(); syncHud(); };
+function bumpStake(dir){
+  const step=stepFor(bank);
+  if(dir>0) stake=Math.min(bank, Math.floor(stake/step)*step + step);
+  else      stake=Math.max(MIN_STAKE, Math.ceil(stake/step)*step - step);
+  sndChip(); syncHud();
+  if(pendingSide!==null){
+    const btn=document.getElementById("confirmBet");
+    btn.innerHTML=`<span class="dot ${pendingSide===BLACK?"b":"w"}"></span> Lock in ${fmt(stake)}`;
+  }
+}
+document.getElementById("stakeUp").onclick=()=>bumpStake(1);
+document.getElementById("stakeDown").onclick=()=>bumpStake(-1);
+document.getElementById("allIn").onclick=()=>{
+  stake=Math.max(MIN_STAKE, bank); sndChip(); syncHud();
+  if(pendingSide!==null){
+    const btn=document.getElementById("confirmBet");
+    btn.innerHTML=`<span class="dot ${pendingSide===BLACK?"b":"w"}"></span> Lock in ${fmt(stake)}`;
+  }
+};
 document.getElementById("muteBtn").onclick=e=>{ muted=!muted; e.target.style.opacity=muted?.25:.6; e.target.textContent=muted?"♪̸":"♪"; if(!muted) ac(); };
 let flashT=null;
 function flash(msg,kind){ const f=document.getElementById("flash"); f.textContent=msg; f.className="flash show "+(kind||"");
