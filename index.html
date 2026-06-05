@@ -121,25 +121,50 @@
 
   .muteBtn{background:none;border:none;color:var(--gold);font-size:18px;opacity:.6;cursor:pointer;}
 
-  .feed{
-    padding:4px 14px 0; min-height:46px; display:flex; flex-direction:column;
-    justify-content:flex-end; gap:2px; overflow:hidden;
-    border-top:1px solid #2a0820;
+  .opponents{padding:4px 12px 0;}
+  .opponent{
+    background:linear-gradient(180deg, rgba(255,204,51,.06), rgba(0,0,0,.25));
+    border:1px solid #2a0820; border-radius:12px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
   }
-  .feedline{
-    font-size:10.5px; letter-spacing:.4px; line-height:1.3;
-    animation:feedin .35s ease-out both;
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-    font-variant-numeric:tabular-nums;
+  .opponent.top{
+    display:flex; align-items:center; gap:10px; padding:7px 12px; min-height:48px;
   }
-  .feedline .who{font-weight:800; opacity:.95;}
-  .feedline.bet{color:#c8b89a;}
-  .feedline.win{color:var(--neon); text-shadow:0 0 8px rgba(57,255,158,.4);}
-  .feedline.lose{color:var(--hot); text-shadow:0 0 8px rgba(255,42,92,.35);}
-  @keyframes feedin{
-    from{opacity:0; transform:translateY(10px);}
-    to{opacity:.9; transform:translateY(0);}
+  .opp-av{
+    flex:0 0 36px; width:36px; height:36px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-weight:900; font-size:15px; color:#fff;
+    border:2px solid rgba(255,255,255,.18);
+    box-shadow:inset 0 -3px 8px rgba(0,0,0,.4), 0 0 10px rgba(0,0,0,.35);
+    text-shadow:0 1px 2px rgba(0,0,0,.5);
   }
+  .opp-body{flex:1; min-width:0; display:flex; flex-direction:column;}
+  .opp-name{font-size:10px; font-weight:800; letter-spacing:1.5px; text-transform:uppercase; opacity:.7;
+            white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .opp-bet{font-size:13px; font-weight:900; font-variant-numeric:tabular-nums;
+           white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#f0ece2;}
+  .opp-bet.thinking{opacity:.4; font-style:italic; font-weight:600; font-size:11px;
+                    animation:thinkpulse 1.4s ease-in-out infinite;}
+  .opp-bet.win{color:var(--neon); text-shadow:0 0 8px rgba(57,255,158,.4);}
+  .opp-bet.lose{color:var(--hot); text-shadow:0 0 8px rgba(255,42,92,.4);}
+  .opp-dot{width:8px; height:8px; border-radius:50%; display:inline-block;
+           vertical-align:middle; margin-right:5px;}
+  .opp-dot.b{background:#0a0908; border:1px solid #555;}
+  .opp-dot.w{background:#fff; border:1px solid #aaa;}
+  @keyframes thinkpulse{0%,100%{opacity:.3;}50%{opacity:.6;}}
+  @keyframes lockpop{0%{transform:scale(.85);}60%{transform:scale(1.08);}100%{transform:scale(1);}}
+  .opp-bet.justlocked{animation:lockpop .35s ease-out;}
+
+  .board-row{display:flex; align-items:stretch; gap:6px; padding:6px 12px; flex:1; min-height:0;}
+  .opponent.side{
+    flex:0 0 66px; display:flex; flex-direction:column; align-items:center;
+    padding:8px 4px; gap:4px; text-align:center;
+  }
+  .opponent.side .opp-av{flex:0 0 32px; width:32px; height:32px; font-size:13px;}
+  .opponent.side .opp-name{font-size:9px; letter-spacing:.6px; max-width:100%;}
+  .opponent.side .opp-bet{font-size:11px; max-width:100%; line-height:1.15;}
+  .opponent.side .opp-bet.thinking{font-size:10px;}
+  .board-row .boardwrap{flex:1; min-width:0; padding:0;}
 
   .confirmrow{display:flex; gap:10px;}
   .confirmrow .cancel{
@@ -223,9 +248,29 @@
     <div class="odd w"><div class="x"><span id="oddW">1.00</span><span class="m">×</span></div><div class="lbl">White</div></div>
   </div>
 
-  <div class="boardwrap"><canvas id="board"></canvas></div>
+  <div class="opponents">
+    <div class="opponent top" id="opp_whale">
+      <div class="opp-av"></div>
+      <div class="opp-body">
+        <div class="opp-name"></div>
+        <div class="opp-bet thinking">thinking…</div>
+      </div>
+    </div>
+  </div>
 
-  <div class="feed" id="feed"></div>
+  <div class="board-row">
+    <div class="opponent side" id="opp_jane">
+      <div class="opp-av"></div>
+      <div class="opp-name"></div>
+      <div class="opp-bet thinking">…</div>
+    </div>
+    <div class="boardwrap"><canvas id="board"></canvas></div>
+    <div class="opponent side" id="opp_tako">
+      <div class="opp-av"></div>
+      <div class="opp-name"></div>
+      <div class="opp-bet thinking">…</div>
+    </div>
+  </div>
 
   <div class="controls">
     <div id="betPanel">
@@ -396,37 +441,31 @@ let round=null, board=null, showOwner=null, lastMove=null, phase="bet";
 let pendingSide=null;
 let geom={pad:0,cell:0,size:0};
 
-/* ---------- Patrons (persistent skill tiers, hidden) ---------- */
-const PLAYER_SEED=[
-  {name:"Big Mike",      fin:"high"},
-  {name:"Whale_88",      fin:"high"},
-  {name:"Goldie",        fin:"high"},
-  {name:"Velvet Jane",   fin:"mid"},
-  {name:"Lucky Lin",     fin:"mid"},
-  {name:"Marble Mei",    fin:"mid"},
-  {name:"Hanchan Hank",  fin:"mid"},
-  {name:"Dora",          fin:"mid"},
-  {name:"Tako",          fin:"low"},
-  {name:"Stone Cold Sam",fin:"low"},
-  {name:"Kifu Kai",      fin:"low"},
-  {name:"Jet",           fin:"low"},
+/* ---------- The three opponents (persistent hidden skill) ---------- */
+const REGULARS=[
+  {id:"whale", name:"Whale_88",    fin:"high", color:"#3a5cd8", initial:"W"},
+  {id:"jane",  name:"Velvet Jane", fin:"mid",  color:"#c0386a", initial:"J"},
+  {id:"tako",  name:"Tako",        fin:"low",  color:"#2fa382", initial:"T"},
 ];
 const SKILL_ACC={sharp:0.75, mid:0.55, fish:0.40};
-function loadPatrons(){
+function loadOpponents(){
+  let savedMap={};
   try{
-    const saved=JSON.parse(localStorage.getItem("bb3_patrons")||"null");
-    if(Array.isArray(saved) && saved.length===PLAYER_SEED.length) return saved;
+    const saved=JSON.parse(localStorage.getItem("bb3_opps")||"null");
+    if(Array.isArray(saved)) saved.forEach(s=>savedMap[s.id]=s.skill);
   }catch(e){}
-  // assign skill: 20% sharp, 50% mid, 30% fish
-  const out=PLAYER_SEED.map(p=>{
-    const r=Math.random();
-    const skill=r<0.20?"sharp":r<0.70?"mid":"fish";
-    return {name:p.name, fin:p.fin, skill};
+  const out=REGULARS.map(r=>{
+    let skill=savedMap[r.id];
+    if(!skill){
+      const x=Math.random();
+      skill = x<0.20?"sharp" : x<0.70?"mid" : "fish";
+    }
+    return {...r, skill, bet:null, decideAt:0};
   });
-  localStorage.setItem("bb3_patrons", JSON.stringify(out));
+  localStorage.setItem("bb3_opps", JSON.stringify(out.map(o=>({id:o.id, skill:o.skill}))));
   return out;
 }
-const PATRONS=loadPatrons();
+const OPPONENTS=loadOpponents();
 function pick(a){ return a[(Math.random()*a.length)|0]; }
 function rngStake(fin){
   if(fin==="high") return pick([2500,5000,10000,15000,25000,40000]);
@@ -437,7 +476,6 @@ function rngStake(fin){
 /* ---------- Pool & odds ---------- */
 const SEED=5000, RAKE=0.95;
 let pool={black:SEED, white:SEED};
-let tableBets=[];          // {name, side, stake, skill} placed by patrons this round
 let playerLock=null;       // {side, stake, odds, payout}
 function oddsFor(side){
   const total=pool.black+pool.white;
@@ -450,48 +488,59 @@ function updateOdds(){
   refreshConfirmLabel();
 }
 
-/* ---------- Feed ---------- */
-function pushFeed(html, kind){
-  const el=document.getElementById("feed");
-  const line=document.createElement("div");
-  line.className="feedline "+(kind||"bet");
-  line.innerHTML=html;
-  el.appendChild(line);
-  while(el.children.length>4) el.removeChild(el.firstChild);
-}
-function clearFeed(){ document.getElementById("feed").innerHTML=""; }
-
-/* ---------- Patron betting (uses real winner via skill model) ---------- */
-function patronPlacesBet(){
-  if(!round) return;
-  const p=pick(PATRONS);
-  const correct=Math.random() < SKILL_ACC[p.skill];
-  const side = correct ? round.winner : opp(round.winner);
-  const stake = rngStake(p.fin);
-  pool[side===BLACK?"black":"white"] += stake;
-  tableBets.push({name:p.name, side, stake, skill:p.skill});
-  pushFeed(`<span class="who">${p.name}</span> drops ${fmt(stake)} on ${side===BLACK?"Black":"White"}`, "bet");
-  updateOdds();
-}
-let chatterTimer=null;
-function chatterTick(){
-  if(phase!=="bet") return;
-  patronPlacesBet();
-  chatterTimer=setTimeout(chatterTick, 900+Math.random()*1700);
-}
-function startChatter(){ stopChatter(); chatterTimer=setTimeout(chatterTick, 600); }
-function stopChatter(){ if(chatterTimer){ clearTimeout(chatterTimer); chatterTimer=null; } }
-function resolveTableBets(winner){
-  const sample=tableBets.slice().sort(()=>Math.random()-0.5).slice(0,4);
-  sample.forEach((b,i)=>{
-    setTimeout(()=>{
-      const w=b.side===winner;
-      pushFeed(w
-        ? `<span class="who">${b.name}</span> cashes out +${fmt(b.stake)}`
-        : `<span class="who">${b.name}</span> busts −${fmt(b.stake)}`, w?"win":"lose");
-    }, 450+i*500);
+/* ---------- Opponent UI & decisions ---------- */
+function initOpponentPanels(){
+  OPPONENTS.forEach(o=>{
+    const el=document.getElementById("opp_"+o.id);
+    const av=el.querySelector(".opp-av");
+    av.style.background=`radial-gradient(circle at 35% 30%, ${o.color}dd, ${o.color}66)`;
+    av.textContent=o.initial;
+    el.querySelector(".opp-name").textContent=o.name;
   });
-  tableBets=[];
+}
+function updateOpponentUI(o){
+  const el=document.getElementById("opp_"+o.id);
+  const betEl=el.querySelector(".opp-bet");
+  if(phase==="done" && o.bet){
+    const won = o.bet.side===round.winner;
+    betEl.className = "opp-bet "+(won?"win":"lose");
+    betEl.textContent = (won?"+":"−") + fmt(o.bet.stake);
+  } else if(o.bet){
+    betEl.className="opp-bet justlocked";
+    betEl.innerHTML = `<span class="opp-dot ${o.bet.side===BLACK?"b":"w"}"></span>${fmt(o.bet.stake)}`;
+    setTimeout(()=>betEl.classList.remove("justlocked"), 400);
+  } else {
+    betEl.className="opp-bet thinking";
+    betEl.textContent="thinking…";
+  }
+}
+function opponentBets(o){
+  if(o.bet || !round) return;
+  const correct=Math.random() < SKILL_ACC[o.skill];
+  const side = correct ? round.winner : opp(round.winner);
+  const stake = rngStake(o.fin);
+  pool[side===BLACK?"black":"white"] += stake;
+  o.bet={side, stake};
+  updateOdds();
+  updateOpponentUI(o);
+  sndChip();
+}
+function scheduleOpponents(){
+  OPPONENTS.forEach(o=>{
+    o.bet=null;
+    o.decideAt = Date.now() + 4000 + Math.random()*21000;  // 4-25s into the window
+  });
+}
+function fastForwardOpponents(done){
+  const pending=OPPONENTS.filter(o=>!o.bet);
+  if(pending.length===0){ setTimeout(done, 300); return; }
+  let i=0;
+  const tick=()=>{
+    if(i>=pending.length){ setTimeout(done, 350); return; }
+    opponentBets(pending[i++]);
+    setTimeout(tick, 380);
+  };
+  setTimeout(tick, 200);
 }
 
 /* ---------- Timer ---------- */
@@ -504,11 +553,14 @@ function startTimer(){
   el.classList.remove("urgent","locked");
   const tick=()=>{
     if(phase!=="bet"){ return; }
-    const ms=Math.max(0, timerEnds-Date.now());
+    const now=Date.now();
+    const ms=Math.max(0, timerEnds-now);
     const pct=ms/TIMER_MS*100;
     document.getElementById("timerBar").style.width=pct+"%";
     document.getElementById("timerText").textContent=Math.ceil(ms/1000)+"s";
     if(ms<=5000) el.classList.add("urgent");
+    // opponent decisions
+    OPPONENTS.forEach(o=>{ if(!o.bet && now>=o.decideAt) opponentBets(o); });
     if(ms<=0){ timerExpired(); return; }
     timerTimer=setTimeout(tick, 100);
   };
@@ -517,8 +569,6 @@ function startTimer(){
 function stopTimer(){ if(timerTimer){ clearTimeout(timerTimer); timerTimer=null; } }
 function timerExpired(){
   if(playerLock) return;
-  stopChatter();
-  // sit-out: jump straight into the play-out, no bet
   startPlayout(null);
 }
 
@@ -588,15 +638,16 @@ function newRound(){
   board=clone(round.steps[round.revealIdx].b);
   showOwner=null; lastMove=null; phase="bet";
   pool={black:SEED, white:SEED};
-  playerLock=null; tableBets=[];
+  playerLock=null;
+  scheduleOpponents();
+  OPPONENTS.forEach(updateOpponentUI);
   document.getElementById("pTitle").textContent="Place your bet";
-  document.getElementById("pSub").textContent="Read the room. Line shifts as patrons lock in. White spots 0.5 komi.";
+  document.getElementById("pSub").textContent="Read the room. Line shifts as opponents lock in.";
   document.getElementById("betPanel").classList.remove("hidden");
   document.getElementById("lockedPanel").classList.add("hidden");
   document.getElementById("nextBtn").classList.add("hidden");
   showChoice(); setBet(true); clampStake(); syncHud(); resize();
-  clearFeed(); updateOdds();
-  startChatter(); startTimer();
+  updateOdds(); startTimer();
 }
 function setBet(on){
   document.getElementById("betBlack").disabled=!on;
@@ -624,7 +675,7 @@ function confirmBet(){
 }
 
 function lockInBet(side){
-  ac(); stopTimer(); stopChatter();
+  ac(); stopTimer();
   pendingSide=null;
   const odds=oddsFor(side);
   const payout=Math.round(stake*odds);
@@ -640,18 +691,12 @@ function lockInBet(side){
   document.getElementById("pSub").textContent="Watching the rest of the room…";
   const tEl=document.getElementById("timer");
   tEl.classList.remove("urgent"); tEl.classList.add("locked");
-  // fast-forward the room: ~2.5s of rapid patron bets
-  let fired=0, target=6+((Math.random()*4)|0);
-  const ff=()=>{
-    if(fired>=target){ setTimeout(()=>startPlayout(side), 350); return; }
-    patronPlacesBet(); fired++;
-    setTimeout(ff, 240+Math.random()*180);
-  };
-  ff();
+  // any opponents who haven't bet yet, lock them in now
+  fastForwardOpponents(()=>startPlayout(side));
 }
 
 function startPlayout(side){
-  phase="playing"; setBet(false); stopChatter(); stopTimer();
+  phase="playing"; setBet(false); stopTimer();
   document.getElementById("pTitle").textContent="Rolling…";
   document.getElementById("pSub").textContent= side===null
     ? "Sat this one out. Watching the result."
@@ -684,7 +729,7 @@ function reveal(side){
     flash("Sat it out","lose");
   }
   level++; best=Math.max(best,bank); save(); syncHud();
-  resolveTableBets(round.winner);
+  OPPONENTS.forEach(updateOpponentUI);
   const nb=document.getElementById("nextBtn");
   document.getElementById("betPanel").classList.add("hidden");
   document.getElementById("lockedPanel").classList.add("hidden");
@@ -720,7 +765,7 @@ function flash(msg,kind){ const f=document.getElementById("flash"); f.textConten
   clearTimeout(flashT); flashT=setTimeout(()=>f.classList.remove("show"),1600); }
 window.addEventListener("resize",resize);
 
-syncHud(); newRound();
+initOpponentPanels(); syncHud(); newRound();
 </script>
 </body>
 </html>
